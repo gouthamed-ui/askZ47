@@ -74,13 +74,15 @@ export async function generate(env: any, question: string, matches: any[]) {
         { role: "system", content: SYSTEM_PROMPT },
         { role: "user", content: `SOURCES:\n${context}\n\nQUESTION: ${question}` },
       ],
-      max_tokens: 600,
+      max_tokens: 1536, // reasoning models (GLM/Qwen) spend tokens thinking before the answer
       temperature: 0.2,
     }),
   });
   if (!r.ok) throw new Error(`generate ${r.status}: ${await r.text()}`);
   const d: any = await r.json();
-  const answer: string = d.result?.response ?? "";
+  // Workers AI returns either { response } (Llama) or OpenAI-style { choices[].message.content } (GLM/Qwen).
+  const res = d.result ?? {};
+  const answer: string = (res.response ?? res.choices?.[0]?.message?.content ?? "").trim();
 
   const sources: Source[] = used.map((m, i) => ({
     n: i + 1,
