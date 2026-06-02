@@ -4,20 +4,6 @@
   "main": "./dist/_worker.js/index.js",
   "compatibility_date": "2025-04-15",
   "compatibility_flags": ["nodejs_compat"],
-  "ai": {
-    "binding": "AI"
-  },
-  "vectorize": [
-    {
-      "binding": "VECTORIZE",
-      "index_name": "askz47-index"
-    }
-  ],
-  "kv_namespaces": [
-    {
-      "binding": "KV"
-    }
-  ],
   "assets": {
     "binding": "ASSETS",
     "directory": "./dist"
