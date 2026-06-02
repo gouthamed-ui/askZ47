@@ -7,6 +7,17 @@
   "ai": {
     "binding": "AI"
   },
+  "vectorize": [
+    {
+      "binding": "VECTORIZE",
+      "index_name": "askz47-index"
+    }
+  ],
+  "kv_namespaces": [
+    {
+      "binding": "KV"
+    }
+  ],
   "assets": {
     "binding": "ASSETS",
     "directory": "./dist"
