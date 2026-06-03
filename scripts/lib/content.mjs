@@ -4,8 +4,8 @@ export const INDEX_NAME = "askz47-content";
 export const EMBED_MODEL = "@cf/baai/bge-base-en-v1.5";
 export const EMBED_DIMS = 768;
 
-// The 5 v1 collections, with the fields worth embedding and the public URL shape.
-// urlBase is a best guess at the z47.com path; verified against the live site before launch.
+// The 5 v1 collections. textFields = direct text to embed; refFields = reference
+// fields resolved to names (sectors, focus areas, companies, people) via NAME_MAP.
 export const COLLECTIONS = [
   {
     key: "podcast",
@@ -13,6 +13,7 @@ export const COLLECTIONS = [
     label: "Z47 Moments / Podcast",
     titleField: "name",
     textFields: ["short-description", "body", "founder-testimonial"],
+    refFields: ["primary-sector", "tags", "portfolio-company", "team-members"],
     urlBase: "https://www.z47.com/z47-moments/",
   },
   {
@@ -21,6 +22,7 @@ export const COLLECTIONS = [
     label: "News",
     titleField: "name",
     textFields: ["news-text"],
+    refFields: ["primary-sector", "sectors", "tags", "portfolio", "founders-team-members"],
     urlBase: "https://www.z47.com/news/",
   },
   {
@@ -29,6 +31,7 @@ export const COLLECTIONS = [
     label: "Team FAQ",
     titleField: "name",
     textFields: ["body-richtext"],
+    refFields: [],
     urlBase: null, // FAQs have no standalone page
   },
   {
@@ -37,6 +40,7 @@ export const COLLECTIONS = [
     label: "Portfolio company",
     titleField: "name",
     textFields: ["short-description1", "funding-round", "year-invested", "year-started"],
+    refFields: ["primary-sector", "focus-area", "portfolio-tags", "tags"],
     urlBase: "https://www.z47.com/portfolio/",
   },
   {
@@ -45,8 +49,21 @@ export const COLLECTIONS = [
     label: "Team member",
     titleField: "name",
     textFields: ["designation", "quote", "short-description", "long-description-rich-text", "city"],
+    refFields: ["focus-sectors", "invest-in-sectors-2"],
     urlBase: "https://www.z47.com/team/",
   },
+];
+
+// Collections whose item names resolve reference IDs (sectors, focus areas, tags,
+// company & people names). Item IDs are globally unique, so one flat map covers all.
+export const NAME_MAP_COLLECTIONS = [
+  "6790fc2aa3eb751edaf46b2b", // Primary Sectors
+  "6786a900eb46e0c89b1c5834", // Portfolio Company Focus Areas
+  "6788e218a108e9ee5c34d0a5", // Sectors
+  "6792be40e731ede915abdf8d", // Portfolio Tags
+  "6790fd7fdeb527ef999e5fde", // Topics
+  "6786a963e157e55936dabdd5", // Portfolios (company names)
+  "6786a97c80991a02c593da30", // Teams (people names)
 ];
 
 const WF = "https://api.webflow.com/v2";
@@ -112,15 +129,16 @@ export function htmlToText(html) {
     .trim();
 }
 
-// Fetch all LIVE (published) items of a collection, paginated.
-export async function fetchLiveItems(token, collectionId) {
+// Fetch all items of a collection, paginated. live=true uses the published endpoint.
+export async function fetchItems(token, collectionId, live = true) {
+  const path = live ? "items/live" : "items";
   const items = [];
   let offset = 0;
   const limit = 100;
   for (;;) {
     const d = await withRetry(async () => {
       const r = await fetch(
-        `${WF}/collections/${collectionId}/items/live?limit=${limit}&offset=${offset}`,
+        `${WF}/collections/${collectionId}/${path}?limit=${limit}&offset=${offset}`,
         { headers: wfHeaders(token) },
       );
       if (!r.ok) throw new Error(`Webflow list ${r.status}: ${await r.text()}`);
@@ -135,8 +153,38 @@ export async function fetchLiveItems(token, collectionId) {
   return items;
 }
 
+export const fetchLiveItems = (token, id) => fetchItems(token, id, true);
+
+// Build a flat { itemId -> name } map across the lookup collections, for resolving references.
+export async function buildNameMap(token) {
+  const map = new Map();
+  for (const id of NAME_MAP_COLLECTIONS) {
+    const items = await fetchItems(token, id, false); // all items, not just live
+    for (const it of items) {
+      const name = it.fieldData?.name;
+      if (name) map.set(it.id, String(name));
+    }
+  }
+  return map;
+}
+
+// Resolve an item's reference fields (arrays or single IDs) to deduped names.
+function resolveRefs(fieldData, refFields, nameMap) {
+  const names = [];
+  for (const field of refFields || []) {
+    const v = fieldData[field];
+    if (!v) continue;
+    for (const id of Array.isArray(v) ? v : [v]) {
+      const n = nameMap.get(id);
+      if (n) names.push(n);
+    }
+  }
+  return [...new Set(names)];
+}
+
 // Build the document text + metadata for one CMS item.
-export function buildDoc(col, item) {
+// nameMap resolves reference fields (sectors, focus areas, companies, people) to names.
+export function buildDoc(col, item, nameMap = new Map()) {
   const f = item.fieldData || {};
   const title = f[col.titleField] || "(untitled)";
   const parts = [title];
@@ -144,6 +192,9 @@ export function buildDoc(col, item) {
     const txt = htmlToText(f[field]);
     if (txt) parts.push(txt);
   }
+  const refNames = resolveRefs(f, col.refFields, nameMap);
+  if (refNames.length) parts.push(`Sectors, focus areas & related: ${refNames.join(", ")}`);
+
   const text = parts.join("\n\n").slice(0, 6000); // cap per-item input
   const slug = f.slug || "";
   const url = col.urlBase && slug ? col.urlBase + slug : null;
@@ -155,6 +206,7 @@ export function buildDoc(col, item) {
       collection: col.label,
       title: String(title).slice(0, 200),
       ...(url ? { url } : {}),
+      ...(refNames.length ? { topics: refNames.join(", ").slice(0, 300) } : {}),
       // content the answer model reads for grounding (Vectorize metadata cap is ~10KiB/vector)
       content: flat.slice(0, 2000),
     },

@@ -2,7 +2,7 @@
 // Run: node --env-file=.env scripts/index-content.mjs
 import {
   INDEX_NAME, EMBED_DIMS, COLLECTIONS,
-  cfBase, cfHeaders, requireEnv, fetchLiveItems, buildDoc, embed, withRetry,
+  cfBase, cfHeaders, requireEnv, fetchLiveItems, buildDoc, embed, withRetry, buildNameMap,
 } from "./lib/content.mjs";
 
 const env = requireEnv();
@@ -41,11 +41,14 @@ async function upsert(vectors) {
 
 async function run() {
   await ensureIndex();
+  console.log("Building reference name map (sectors, focus areas, companies, people)…");
+  const nameMap = await buildNameMap(env.WEBFLOW_API_TOKEN);
+  console.log(`✓ Name map: ${nameMap.size} entries`);
   let grandTotal = 0;
 
   for (const col of COLLECTIONS) {
     const items = await fetchLiveItems(env.WEBFLOW_API_TOKEN, col.id);
-    const docs = items.map((it) => buildDoc(col, it)).filter((d) => d.text.length > 20);
+    const docs = items.map((it) => buildDoc(col, it, nameMap)).filter((d) => d.text.length > 20);
     console.log(`\n${col.label}: ${items.length} live items -> ${docs.length} indexable`);
     if (docs[0]) console.log(`  sample url: ${docs[0].metadata.url ?? "(none)"}`);
 

@@ -41,7 +41,7 @@ export async function embedQuestion(env: any, question: string): Promise<number[
   return d.result.data[0];
 }
 
-export async function search(env: any, vector: number[], topK = 6) {
+export async function search(env: any, vector: number[], topK = 10) {
   const r = await fetch(`${cfBase(env)}/vectorize/v2/indexes/${INDEX_NAME}/query`, {
     method: "POST",
     headers: cfHeaders(env),
@@ -53,9 +53,9 @@ export async function search(env: any, vector: number[], topK = 6) {
 }
 
 export async function generate(env: any, question: string, matches: any[]) {
-  // Keep only reasonably relevant matches.
-  const relevant = matches.filter((m) => m.score >= 0.45).slice(0, 6);
-  const used = relevant.length ? relevant : matches.slice(0, 3);
+  // Keep only reasonably relevant matches (more sources help "list all X" questions).
+  const relevant = matches.filter((m) => m.score >= 0.45).slice(0, 8);
+  const used = relevant.length ? relevant : matches.slice(0, 4);
 
   const context = used
     .map((m, i) => {
@@ -74,7 +74,7 @@ export async function generate(env: any, question: string, matches: any[]) {
         { role: "system", content: SYSTEM_PROMPT },
         { role: "user", content: `SOURCES:\n${context}\n\nQUESTION: ${question}` },
       ],
-      max_tokens: 1536, // reasoning models (GLM/Qwen) spend tokens thinking before the answer
+      max_tokens: 2048, // reasoning models (GLM/Qwen) spend tokens thinking before the answer
       temperature: 0.2,
     }),
   });
