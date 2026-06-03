@@ -1,6 +1,6 @@
 ---
-// Plain "Ask Z47" test UI — served at the app root (e.g. z47.webflow.io/app).
-// Same origin as the /api/ask endpoint, so no CORS needed.
+// "Ask Z47" — full-screen, minimal Ask experience (Dixon-Baxi "Ask Us" style).
+// Served at the app root (z47.webflow.io/app); same origin as /api/ask.
 const base = (import.meta.env.BASE_URL || "/").replace(/\/$/, "");
 const endpoint = `${base}/api/ask`;
 const examples = [
@@ -19,59 +19,97 @@ const examples = [
     <meta name="robots" content="noindex" />
     <title>Ask Z47</title>
     <style>
-      :root { --fg:#111; --muted:#666; --line:#e5e5e5; --accent:#111; --bg:#fff; }
+      :root {
+        --fg: #0a0a0a; --muted: #707070; --line: #e6e6e6; --bg: #f7f6f4; --card: #fff;
+      }
       * { box-sizing: border-box; }
+      html, body { height: 100%; }
       body {
         margin: 0; background: var(--bg); color: var(--fg);
-        font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+        font: 17px/1.65 ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
         -webkit-font-smoothing: antialiased;
       }
-      .wrap { max-width: 720px; margin: 0 auto; padding: 56px 20px 96px; }
-      h1 { font-size: 28px; letter-spacing: -0.02em; margin: 0 0 6px; }
-      .sub { color: var(--muted); margin: 0 0 28px; }
-      form { display: flex; gap: 8px; border: 1px solid var(--line); border-radius: 12px; padding: 8px; }
-      form:focus-within { border-color: #bbb; }
+      .wrap {
+        min-height: 100%; max-width: 760px; margin: 0 auto; padding: 32px 24px 80px;
+        display: flex; flex-direction: column; justify-content: center;
+        transition: justify-content .2s ease;
+      }
+      body.answered .wrap { justify-content: flex-start; padding-top: 48px; }
+
+      .hero h1 {
+        font-size: clamp(40px, 7vw, 68px); line-height: 1.0; letter-spacing: -0.03em;
+        margin: 0 0 14px; font-weight: 600;
+      }
+      .hero .sub { color: var(--muted); font-size: 19px; margin: 0 0 30px; max-width: 46ch; }
+      body.answered .hero h1 { font-size: 30px; margin-bottom: 6px; }
+      body.answered .hero .sub { display: none; }
+
+      form {
+        display: flex; align-items: center; gap: 8px;
+        background: var(--card); border: 1px solid var(--line); border-radius: 14px;
+        padding: 8px 8px 8px 18px; box-shadow: 0 1px 2px rgba(0,0,0,.03);
+      }
+      form:focus-within { border-color: #c4c4c4; }
       input {
-        flex: 1; border: 0; outline: 0; font: inherit; padding: 10px 12px; background: transparent; color: var(--fg);
+        flex: 1; border: 0; outline: 0; background: transparent; color: var(--fg);
+        font: inherit; font-size: 18px; padding: 10px 0;
       }
       button.ask {
-        border: 0; background: var(--accent); color: #fff; font: inherit; font-weight: 600;
-        padding: 10px 18px; border-radius: 8px; cursor: pointer;
+        border: 0; background: var(--fg); color: #fff; font: inherit; font-weight: 600;
+        padding: 12px 22px; border-radius: 10px; cursor: pointer; white-space: nowrap;
       }
-      button.ask:disabled { opacity: .5; cursor: default; }
-      .chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0 0; }
+      button.ask:disabled { opacity: .45; cursor: default; }
+
+      .suggestions { display: flex; flex-wrap: wrap; gap: 8px; margin: 18px 2px 0; }
       .chip {
-        border: 1px solid var(--line); background: #fafafa; color: var(--muted);
-        padding: 6px 12px; border-radius: 999px; font-size: 14px; cursor: pointer;
+        border: 1px solid var(--line); background: transparent; color: var(--muted);
+        padding: 7px 14px; border-radius: 999px; font: inherit; font-size: 14.5px; cursor: pointer;
       }
-      .chip:hover { color: var(--fg); border-color: #ccc; }
-      .answer { margin-top: 36px; }
-      .q { font-weight: 600; margin: 0 0 10px; }
-      .a { white-space: pre-wrap; }
-      .status { color: var(--muted); }
-      .sources { margin-top: 22px; border-top: 1px solid var(--line); padding-top: 16px; }
-      .sources h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin: 0 0 10px; }
-      .sources ol { margin: 0; padding-left: 20px; }
-      .sources li { margin: 4px 0; }
-      .sources a { color: var(--fg); }
-      .src-tag { color: var(--muted); font-size: 13px; }
-      .err { color: #b00020; }
-      footer { margin-top: 48px; color: #aaa; font-size: 13px; }
+      .chip:hover { color: var(--fg); border-color: #c4c4c4; background: #fff; }
+      body.answered .suggestions { display: none; }
+
+      .answer { margin-top: 40px; }
+      .answer .q {
+        font-size: 22px; font-weight: 600; letter-spacing: -0.01em; margin: 0 0 16px;
+      }
+      .answer .a { font-size: 18.5px; white-space: pre-wrap; }
+      .answer .a.status, .answer .a.err { color: var(--muted); }
+      .answer .a.err { color: #b00020; }
+
+      .sources { margin-top: 28px; border-top: 1px solid var(--line); padding-top: 18px; }
+      .sources h2 {
+        font-size: 12px; text-transform: uppercase; letter-spacing: .08em;
+        color: var(--muted); margin: 0 0 12px; font-weight: 600;
+      }
+      .sources ol { margin: 0; padding-left: 22px; }
+      .sources li { margin: 6px 0; }
+      .sources a { color: var(--fg); text-underline-offset: 2px; }
+      .src-tag { color: var(--muted); font-size: 13.5px; }
+
+      .again {
+        margin-top: 34px; border: 1px solid var(--line); background: #fff; color: var(--fg);
+        font: inherit; font-size: 15px; padding: 10px 18px; border-radius: 10px; cursor: pointer;
+      }
+      .again:hover { border-color: #c4c4c4; }
+
+      footer { margin-top: auto; padding-top: 56px; color: #b3b0aa; font-size: 13px; }
     </style>
   </head>
-  <body>
+  <body class="initial">
     <main class="wrap">
-      <h1>Ask Z47</h1>
-      <p class="sub">Ask anything about Z47 — portfolio, news, team, and podcasts. Answers come from z47.com content.</p>
+      <header class="hero">
+        <h1>Ask&nbsp;Z47</h1>
+        <p class="sub">Ask anything about Z47 — our portfolio, news, team and podcasts. Answers are drawn from z47.com content.</p>
 
-      <form id="ask" data-endpoint={endpoint}>
-        <input id="q" name="q" type="text" autocomplete="off" placeholder="Ask a question…" required />
-        <button class="ask" type="submit">Ask</button>
-      </form>
+        <form id="ask" data-endpoint={endpoint}>
+          <input id="q" name="q" type="text" autocomplete="off" placeholder="Ask a question…" required />
+          <button class="ask" type="submit">Ask</button>
+        </form>
 
-      <div class="chips" id="chips">
-        {examples.map((ex) => <span class="chip" data-q={ex}>{ex}</span>)}
-      </div>
+        <div class="suggestions" id="chips">
+          {examples.map((ex) => <button class="chip" type="button" data-q={ex}>{ex}</button>)}
+        </div>
+      </header>
 
       <section class="answer" id="answer" hidden>
         <p class="q" id="out-q"></p>
@@ -80,6 +118,7 @@ const examples = [
           <h2>Sources</h2>
           <ol id="out-list"></ol>
         </div>
+        <button class="again" id="again" type="button">Ask another question</button>
       </section>
 
       <footer>AskZ47 · grounded in z47.com content</footer>
@@ -103,7 +142,10 @@ const examples = [
       }
 
       async function ask(question: string) {
-        if (!question.trim()) return;
+        question = question.trim();
+        if (!question) return;
+        document.body.classList.remove("initial");
+        document.body.classList.add("answered");
         panel.hidden = false;
         srcBox.hidden = true;
         srcList.innerHTML = "";
@@ -122,7 +164,7 @@ const examples = [
             outA.className = "a err";
             outA.textContent =
               data.detail && /429|neuron/i.test(data.detail)
-                ? "The assistant is temporarily over its daily AI limit. Please try again later."
+                ? "AskZ47 is temporarily over its daily AI limit. Please try again shortly."
                 : data.error || "Something went wrong. Please try again.";
             return;
           }
@@ -133,20 +175,20 @@ const examples = [
             for (const s of sources) {
               const li = document.createElement("li");
               const a = document.createElement("a");
-              a.href = s.url;
-              a.target = "_blank";
-              a.rel = "noopener";
+              a.href = s.url; a.target = "_blank"; a.rel = "noopener";
               a.textContent = s.title || s.url;
               li.appendChild(a);
-              const tag = document.createElement("span");
-              tag.className = "src-tag";
-              tag.textContent = s.collection ? `  · ${s.collection}` : "";
-              li.appendChild(tag);
+              if (s.collection) {
+                const tag = document.createElement("span");
+                tag.className = "src-tag";
+                tag.textContent = `  · ${s.collection}`;
+                li.appendChild(tag);
+              }
               srcList.appendChild(li);
             }
             srcBox.hidden = false;
           }
-        } catch (e) {
+        } catch {
           outA.className = "a err";
           outA.textContent = "Network error. Please try again.";
         } finally {
@@ -154,17 +196,17 @@ const examples = [
         }
       }
 
-      form.addEventListener("submit", (e) => {
-        e.preventDefault();
-        ask(input.value);
-      });
+      form.addEventListener("submit", (e) => { e.preventDefault(); ask(input.value); });
       document.getElementById("chips")!.addEventListener("click", (e) => {
-        const t = e.target as HTMLElement;
-        const q = t.dataset.q;
-        if (q) {
-          input.value = q;
-          ask(q);
-        }
+        const q = (e.target as HTMLElement).dataset.q;
+        if (q) { input.value = q; ask(q); }
+      });
+      document.getElementById("again")!.addEventListener("click", () => {
+        document.body.classList.remove("answered");
+        document.body.classList.add("initial");
+        panel.hidden = true;
+        input.value = "";
+        input.focus();
       });
     </script>
   </body>
