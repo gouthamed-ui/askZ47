@@ -204,6 +204,7 @@ export function buildDoc(col, item, nameMap = new Map()) {
     text,
     metadata: {
       collection: col.label,
+      kind: col.key, // filterable: portfolio | team | news | podcast | faq
       title: String(title).slice(0, 200),
       ...(url ? { url } : {}),
       ...(refNames.length ? { topics: refNames.join(", ").slice(0, 300) } : {}),

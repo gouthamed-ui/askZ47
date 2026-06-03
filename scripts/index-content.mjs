@@ -27,6 +27,30 @@ async function ensureIndex() {
   console.log(`✓ Created Vectorize index "${INDEX_NAME}" (${EMBED_DIMS}d, cosine)`);
 }
 
+// Ensure a metadata index exists on `kind` so we can filter queries by collection.
+// (Vectorize only indexes vectors upserted AFTER the metadata index is created — we re-upsert all below.)
+async function ensureMetadataIndex() {
+  const list = await fetch(
+    `${cfBase(env)}/vectorize/v2/indexes/${INDEX_NAME}/metadata_index/list`,
+    { headers: cfHeaders(env) },
+  );
+  const props = (await list.json()).result?.metadataIndexes?.map((m) => m.propertyName) || [];
+  if (props.includes("kind")) {
+    console.log('✓ Metadata index on "kind" exists');
+    return;
+  }
+  const r = await fetch(
+    `${cfBase(env)}/vectorize/v2/indexes/${INDEX_NAME}/metadata_index/create`,
+    {
+      method: "POST",
+      headers: cfHeaders(env),
+      body: JSON.stringify({ propertyName: "kind", indexType: "string" }),
+    },
+  );
+  if (!r.ok) throw new Error(`Create metadata index failed: ${r.status} ${await r.text()}`);
+  console.log('✓ Created metadata index on "kind"');
+}
+
 async function upsert(vectors) {
   const ndjson = vectors.map((v) => JSON.stringify(v)).join("\n");
   await withRetry(async () => {
@@ -41,6 +65,7 @@ async function upsert(vectors) {
 
 async function run() {
   await ensureIndex();
+  await ensureMetadataIndex();
   console.log("Building reference name map (sectors, focus areas, companies, people)…");
   const nameMap = await buildNameMap(env.WEBFLOW_API_TOKEN);
   console.log(`✓ Name map: ${nameMap.size} entries`);
