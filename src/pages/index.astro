@@ -1,31 +1,171 @@
 ---
-import Layout from "../layouts/Layout.astro";
-
-const base = (import.meta.env.BASE_URL || "/").replace(/\/$/, "") || "";
+// Plain "Ask Z47" test UI — served at the app root (e.g. z47.webflow.io/app).
+// Same origin as the /api/ask endpoint, so no CORS needed.
+const base = (import.meta.env.BASE_URL || "/").replace(/\/$/, "");
+const endpoint = `${base}/api/ask`;
+const examples = [
+  "Tell me about the Scapia investment",
+  "What fintech companies has Z47 backed?",
+  "Which team members focus on enterprise AI?",
+  "What does Z47 mean by founders first?",
+];
 ---
 
-<Layout>
-  <div id="app">
-    <div>
-      <a href="https://astro.build" target="_blank" rel="noopener noreferrer">
-        <img src={`${base}/astro.svg`} class="logo" alt="Astro logo" />
-      </a>
-      <a href="https://webflow.com/cloud" target="_blank" rel="noopener noreferrer">
-        <img src={`${base}/webflow.svg`} class="logo vanilla" alt="Webflow logo" />
-      </a>
-      <h1>Astro + Webflow Cloud</h1>
-      <div class="card">
-        <button id="counter" type="button"></button>
-      </div>
-      <p class="read-the-docs">
-        Click on the Astro and Webflow logos to learn more
-      </p>
-    </div>
-  </div>
-  <script>
-    import { setupCounter } from "../lib/counter";
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <title>Ask Z47</title>
+    <style>
+      :root { --fg:#111; --muted:#666; --line:#e5e5e5; --accent:#111; --bg:#fff; }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0; background: var(--bg); color: var(--fg);
+        font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+        -webkit-font-smoothing: antialiased;
+      }
+      .wrap { max-width: 720px; margin: 0 auto; padding: 56px 20px 96px; }
+      h1 { font-size: 28px; letter-spacing: -0.02em; margin: 0 0 6px; }
+      .sub { color: var(--muted); margin: 0 0 28px; }
+      form { display: flex; gap: 8px; border: 1px solid var(--line); border-radius: 12px; padding: 8px; }
+      form:focus-within { border-color: #bbb; }
+      input {
+        flex: 1; border: 0; outline: 0; font: inherit; padding: 10px 12px; background: transparent; color: var(--fg);
+      }
+      button.ask {
+        border: 0; background: var(--accent); color: #fff; font: inherit; font-weight: 600;
+        padding: 10px 18px; border-radius: 8px; cursor: pointer;
+      }
+      button.ask:disabled { opacity: .5; cursor: default; }
+      .chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0 0; }
+      .chip {
+        border: 1px solid var(--line); background: #fafafa; color: var(--muted);
+        padding: 6px 12px; border-radius: 999px; font-size: 14px; cursor: pointer;
+      }
+      .chip:hover { color: var(--fg); border-color: #ccc; }
+      .answer { margin-top: 36px; }
+      .q { font-weight: 600; margin: 0 0 10px; }
+      .a { white-space: pre-wrap; }
+      .status { color: var(--muted); }
+      .sources { margin-top: 22px; border-top: 1px solid var(--line); padding-top: 16px; }
+      .sources h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin: 0 0 10px; }
+      .sources ol { margin: 0; padding-left: 20px; }
+      .sources li { margin: 4px 0; }
+      .sources a { color: var(--fg); }
+      .src-tag { color: var(--muted); font-size: 13px; }
+      .err { color: #b00020; }
+      footer { margin-top: 48px; color: #aaa; font-size: 13px; }
+    </style>
+  </head>
+  <body>
+    <main class="wrap">
+      <h1>Ask Z47</h1>
+      <p class="sub">Ask anything about Z47 — portfolio, news, team, and podcasts. Answers come from z47.com content.</p>
 
-    const counterEl = document.querySelector<HTMLButtonElement>("#counter")!;
-    setupCounter(counterEl);
-  </script>
-</Layout>
+      <form id="ask" data-endpoint={endpoint}>
+        <input id="q" name="q" type="text" autocomplete="off" placeholder="Ask a question…" required />
+        <button class="ask" type="submit">Ask</button>
+      </form>
+
+      <div class="chips" id="chips">
+        {examples.map((ex) => <span class="chip" data-q={ex}>{ex}</span>)}
+      </div>
+
+      <section class="answer" id="answer" hidden>
+        <p class="q" id="out-q"></p>
+        <div class="a" id="out-a"></div>
+        <div class="sources" id="out-sources" hidden>
+          <h2>Sources</h2>
+          <ol id="out-list"></ol>
+        </div>
+      </section>
+
+      <footer>AskZ47 · grounded in z47.com content</footer>
+    </main>
+
+    <script>
+      const form = document.getElementById("ask") as HTMLFormElement;
+      const input = document.getElementById("q") as HTMLInputElement;
+      const askBtn = form.querySelector("button.ask") as HTMLButtonElement;
+      const endpoint = form.dataset.endpoint as string;
+
+      const panel = document.getElementById("answer")!;
+      const outQ = document.getElementById("out-q")!;
+      const outA = document.getElementById("out-a")!;
+      const srcBox = document.getElementById("out-sources")!;
+      const srcList = document.getElementById("out-list")!;
+
+      function setBusy(b: boolean) {
+        askBtn.disabled = b;
+        input.disabled = b;
+      }
+
+      async function ask(question: string) {
+        if (!question.trim()) return;
+        panel.hidden = false;
+        srcBox.hidden = true;
+        srcList.innerHTML = "";
+        outQ.textContent = question;
+        outA.className = "a status";
+        outA.textContent = "Thinking…";
+        setBusy(true);
+        try {
+          const res = await fetch(endpoint, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ question }),
+          });
+          const data = await res.json();
+          if (!res.ok || data.error) {
+            outA.className = "a err";
+            outA.textContent =
+              data.detail && /429|neuron/i.test(data.detail)
+                ? "The assistant is temporarily over its daily AI limit. Please try again later."
+                : data.error || "Something went wrong. Please try again.";
+            return;
+          }
+          outA.className = "a";
+          outA.textContent = data.answer || "(no answer)";
+          const sources = (data.sources || []).filter((s: any) => s.url);
+          if (sources.length) {
+            for (const s of sources) {
+              const li = document.createElement("li");
+              const a = document.createElement("a");
+              a.href = s.url;
+              a.target = "_blank";
+              a.rel = "noopener";
+              a.textContent = s.title || s.url;
+              li.appendChild(a);
+              const tag = document.createElement("span");
+              tag.className = "src-tag";
+              tag.textContent = s.collection ? `  · ${s.collection}` : "";
+              li.appendChild(tag);
+              srcList.appendChild(li);
+            }
+            srcBox.hidden = false;
+          }
+        } catch (e) {
+          outA.className = "a err";
+          outA.textContent = "Network error. Please try again.";
+        } finally {
+          setBusy(false);
+        }
+      }
+
+      form.addEventListener("submit", (e) => {
+        e.preventDefault();
+        ask(input.value);
+      });
+      document.getElementById("chips")!.addEventListener("click", (e) => {
+        const t = e.target as HTMLElement;
+        const q = t.dataset.q;
+        if (q) {
+          input.value = q;
+          ask(q);
+        }
+      });
+    </script>
+  </body>
+</html>
