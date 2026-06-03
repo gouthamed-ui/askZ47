@@ -1,5 +1,6 @@
 ---
-// "Ask Z47" — full-screen, minimal Ask experience (Dixon-Baxi "Ask Us" style).
+// "Ask Z47" — full-screen Ask experience, modeled on askus.dixonbaxi.com,
+// in Z47's light brand palette (white / black / Primary Orange).
 // Served at the app root (z47.webflow.io/app); same origin as /api/ask.
 const base = (import.meta.env.BASE_URL || "/").replace(/\/$/, "");
 const endpoint = `${base}/api/ask`;
@@ -8,6 +9,13 @@ const examples = [
   "What fintech companies has Z47 backed?",
   "Which team members focus on enterprise AI?",
   "What does Z47 mean by founders first?",
+];
+const rotating = [
+  "Portfolio companies and sectors.",
+  "Funding news and rounds.",
+  "The team and their focus areas.",
+  "Podcasts and founder stories.",
+  "Anything from z47.com.",
 ];
 ---
 
@@ -20,48 +28,64 @@ const examples = [
     <title>Ask Z47</title>
     <style>
       :root {
-        --fg: #0e0e0e;      /* Primary Black */
-        --muted: #8a8a8a;   /* Mid Grey */
-        --line: #e6e6e6;    /* light divider */
-        --bg: #ffffff;      /* Primary White */
-        --card: #ffffff;
-        --accent: #e8702a;  /* Primary Orange */
+        --fg: #0e0e0e;        /* Primary Black */
+        --muted: #8a8a8a;     /* Mid Grey */
+        --line: #e6e6e6;      /* light divider */
+        --bg: #ffffff;        /* Primary White */
+        --wash: #fff7f1;      /* soft orange wash (active) */
+        --accent: #e8702a;    /* Primary Orange */
       }
       * { box-sizing: border-box; }
       html, body { height: 100%; }
       body {
-        margin: 0; background: var(--bg); color: var(--fg);
+        margin: 0; color: var(--fg); background: var(--bg);
         font: 17px/1.65 ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
         -webkit-font-smoothing: antialiased;
+        transition: background-color .5s ease;
       }
+      body.active { background: var(--wash); }
+
+      .topbar { position: fixed; top: 16px; right: 20px; z-index: 5; }
+      .topbar a { color: var(--muted); text-decoration: none; font-size: 13.5px; }
+      .topbar a:hover { color: var(--accent); }
+
       .wrap {
-        min-height: 100%; max-width: 760px; margin: 0 auto; padding: 32px 24px 80px;
+        min-height: 100%; max-width: 760px; margin: 0 auto; padding: 40px 24px 72px;
         display: flex; flex-direction: column; justify-content: center;
-        transition: justify-content .2s ease;
       }
-      body.answered .wrap { justify-content: flex-start; padding-top: 48px; }
+      body.answered .wrap { justify-content: flex-start; padding-top: 44px; }
+
+      .hero { animation: rise .5s ease both; }
+      @keyframes rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
 
       .hero h1 {
-        font-size: clamp(40px, 7vw, 68px); line-height: 1.0; letter-spacing: -0.03em;
-        margin: 0 0 14px; font-weight: 600;
+        font-size: clamp(38px, 7vw, 66px); line-height: 1.02; letter-spacing: -0.03em;
+        margin: 0 0 18px; font-weight: 600;
       }
-      .hero .sub { color: var(--muted); font-size: 19px; margin: 0 0 30px; max-width: 46ch; }
-      body.answered .hero h1 { font-size: 30px; margin-bottom: 6px; }
-      body.answered .hero .sub { display: none; }
+      .hero h1 .light { color: var(--muted); font-weight: 400; }
+      body.answered .hero h1 { font-size: clamp(24px, 4vw, 30px); margin-bottom: 6px; }
+
+      /* rotating subtitle */
+      .ticker { height: 1.6em; color: var(--fg); font-size: 17px; margin: 0 0 30px; }
+      .ticker span { display: inline-block; animation: fade 2.6s ease-in-out; }
+      @keyframes fade { 0%{opacity:0; transform:translateY(4px);} 15%,85%{opacity:1; transform:none;} 100%{opacity:0;} }
+      body.answered .ticker { display: none; }
 
       form {
         display: flex; align-items: center; gap: 8px;
-        background: var(--card); border: 1px solid var(--line); border-radius: 14px;
+        background: #fff; border: 1px solid var(--line); border-radius: 14px;
         padding: 8px 8px 8px 18px; box-shadow: 0 1px 2px rgba(0,0,0,.03);
+        transition: border-color .15s ease, box-shadow .15s ease;
       }
       form:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(232,112,42,.12); }
       input {
-        flex: 1; border: 0; outline: 0; background: transparent; color: var(--fg);
-        font: inherit; font-size: 18px; padding: 10px 0; caret-color: var(--accent);
+        flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; color: var(--fg);
+        font: inherit; font-size: 18px; padding: 12px 0; caret-color: var(--accent);
       }
       button.ask {
         border: 0; background: var(--accent); color: #fff; font: inherit; font-weight: 600;
         padding: 12px 22px; border-radius: 10px; cursor: pointer; white-space: nowrap;
+        transition: background-color .15s ease;
       }
       button.ask:hover { background: #d96420; }
       button.ask:disabled { opacity: .45; cursor: default; }
@@ -69,45 +93,63 @@ const examples = [
       .suggestions { display: flex; flex-wrap: wrap; gap: 8px; margin: 18px 2px 0; }
       .chip {
         border: 1px solid var(--line); background: transparent; color: var(--muted);
-        padding: 7px 14px; border-radius: 999px; font: inherit; font-size: 14.5px; cursor: pointer;
+        padding: 8px 14px; border-radius: 999px; font: inherit; font-size: 14.5px; cursor: pointer;
+        transition: color .12s ease, border-color .12s ease;
       }
       .chip:hover { color: var(--accent); border-color: var(--accent); }
       body.answered .suggestions { display: none; }
 
       .answer { margin-top: 40px; }
-      .answer .q {
-        font-size: 22px; font-weight: 600; letter-spacing: -0.01em; margin: 0 0 16px;
-      }
-      .answer .a { font-size: 18.5px; white-space: pre-wrap; }
+      .answer .q { font-size: clamp(19px, 3vw, 22px); font-weight: 600; letter-spacing: -0.01em; margin: 0 0 16px; }
+      .answer .a { font-size: 18.5px; white-space: pre-wrap; min-height: 1.6em; }
       .answer .a.status, .answer .a.err { color: var(--muted); }
       .answer .a.err { color: #b00020; }
+      .cite { color: var(--accent); font-weight: 600; }
+      .caret { color: var(--accent); animation: blink 1s steps(1) infinite; }
+      @keyframes blink { 50% { opacity: 0; } }
+
+      .controls { margin-top: 14px; }
+      .stop {
+        border: 1px solid var(--line); background: #fff; color: var(--muted);
+        font: inherit; font-size: 14px; padding: 7px 14px; border-radius: 8px; cursor: pointer;
+      }
+      .stop:hover { color: var(--accent); border-color: var(--accent); }
 
       .sources { margin-top: 28px; border-top: 1px solid var(--line); padding-top: 18px; }
-      .sources h2 {
-        font-size: 12px; text-transform: uppercase; letter-spacing: .08em;
-        color: var(--muted); margin: 0 0 12px; font-weight: 600;
-      }
+      .sources h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 0 0 12px; font-weight: 600; }
       .sources ol { margin: 0; padding-left: 22px; }
       .sources li { margin: 6px 0; }
       .sources a { color: var(--fg); text-underline-offset: 2px; }
       .sources a:hover { color: var(--accent); text-decoration-color: var(--accent); }
       .src-tag { color: var(--muted); font-size: 13.5px; }
-      .cite { color: var(--accent); font-weight: 600; }
 
       .again {
-        margin-top: 34px; border: 1px solid var(--line); background: #fff; color: var(--fg);
+        margin-top: 30px; border: 1px solid var(--line); background: #fff; color: var(--fg);
         font: inherit; font-size: 15px; padding: 10px 18px; border-radius: 10px; cursor: pointer;
       }
       .again:hover { border-color: var(--accent); color: var(--accent); }
 
-      footer { margin-top: auto; padding-top: 56px; color: #b3b0aa; font-size: 13px; }
+      footer { margin-top: auto; padding-top: 48px; color: #b3b0aa; font-size: 12.5px; max-width: 52ch; }
+      footer a { color: var(--muted); }
+
+      @media (max-width: 600px) {
+        .wrap { padding: 28px 18px 56px; }
+        .hero h1 { margin-bottom: 14px; }
+        .ticker { font-size: 15.5px; margin-bottom: 22px; }
+        form { padding: 6px 6px 6px 14px; }
+        input { font-size: 16px; padding: 11px 0; }
+        button.ask { padding: 11px 16px; }
+        .answer .a { font-size: 17px; }
+      }
     </style>
   </head>
   <body class="initial">
+    <div class="topbar"><a href="https://www.z47.com" target="_blank" rel="noopener">z47.com ↗</a></div>
+
     <main class="wrap">
       <header class="hero">
-        <h1>Ask&nbsp;Z47</h1>
-        <p class="sub">Ask anything about Z47 — our portfolio, news, team and podcasts. Answers are drawn from z47.com content.</p>
+        <h1>Ask Z47 <span class="light">anything.</span></h1>
+        <p class="ticker" id="ticker" data-phrases={JSON.stringify(rotating)}><span>{rotating[0]}</span></p>
 
         <form id="ask" data-endpoint={endpoint}>
           <input id="q" name="q" type="text" autocomplete="off" placeholder="Ask a question…" required />
@@ -122,6 +164,7 @@ const examples = [
       <section class="answer" id="answer" hidden>
         <p class="q" id="out-q"></p>
         <div class="a" id="out-a"></div>
+        <div class="controls"><button class="stop" id="stop" type="button" hidden>Stop</button></div>
         <div class="sources" id="out-sources" hidden>
           <h2>Sources</h2>
           <ol id="out-list"></ol>
@@ -129,7 +172,9 @@ const examples = [
         <button class="again" id="again" type="button">Ask another question</button>
       </section>
 
-      <footer>AskZ47 · grounded in z47.com content</footer>
+      <footer>
+        Answers are drawn from z47.com content (portfolio, news, team, podcasts) and may not always be fully accurate. · <a href="https://www.z47.com" target="_blank" rel="noopener">z47.com</a>
+      </footer>
     </main>
 
     <script>
@@ -141,27 +186,69 @@ const examples = [
       const panel = document.getElementById("answer")!;
       const outQ = document.getElementById("out-q")!;
       const outA = document.getElementById("out-a")!;
+      const stopBtn = document.getElementById("stop") as HTMLButtonElement;
       const srcBox = document.getElementById("out-sources")!;
       const srcList = document.getElementById("out-list")!;
 
-      function setBusy(b: boolean) {
-        askBtn.disabled = b;
-        input.disabled = b;
+      // ---- rotating subtitle ----
+      const ticker = document.getElementById("ticker")!;
+      const phrases: string[] = JSON.parse(ticker.dataset.phrases || "[]");
+      let pi = 0;
+      if (phrases.length > 1) {
+        setInterval(() => {
+          pi = (pi + 1) % phrases.length;
+          ticker.innerHTML = `<span>${phrases[pi]}</span>`;
+        }, 2600);
       }
 
-      function renderAnswer(text: string) {
-        const esc = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-        return esc.replace(/\[(\d+)\]/g, '<span class="cite">[$1]</span>');
+      // ---- activation wash (Dixon-Baxi-style bg shift) ----
+      input.addEventListener("focus", () => document.body.classList.add("active"), { once: false });
+
+      function escapeHtml(s: string) {
+        return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
       }
+      function renderAnswer(text: string, caret = false) {
+        const html = escapeHtml(text).replace(/\[(\d+)\]/g, '<span class="cite">[$1]</span>');
+        return caret ? html + '<span class="caret">▍</span>' : html;
+      }
+
+      // ---- typewriter reveal (cheap "streaming") ----
+      let typeTimer: number | null = null;
+      let fullAnswer = "";
+      function cancelType() { if (typeTimer) { clearTimeout(typeTimer); typeTimer = null; } }
+      function finishType() {
+        cancelType();
+        outA.innerHTML = renderAnswer(fullAnswer);
+        stopBtn.hidden = true;
+      }
+      function typeOut(text: string) {
+        cancelType();
+        fullAnswer = text;
+        const tokens = text.split(/(\s+)/); // words + whitespace preserved
+        let i = 0;
+        stopBtn.hidden = false;
+        const step = () => {
+          i += 2;
+          const partial = tokens.slice(0, i).join("");
+          outA.innerHTML = renderAnswer(partial, i < tokens.length);
+          if (i < tokens.length) typeTimer = window.setTimeout(step, 16);
+          else { stopBtn.hidden = true; typeTimer = null; }
+        };
+        step();
+      }
+      stopBtn.addEventListener("click", finishType);
+
+      function setBusy(b: boolean) { askBtn.disabled = b; input.disabled = b; }
 
       async function ask(question: string) {
         question = question.trim();
         if (!question) return;
+        cancelType();
         document.body.classList.remove("initial");
-        document.body.classList.add("answered");
+        document.body.classList.add("active", "answered");
         panel.hidden = false;
-        srcBox.hidden = true;
-        srcList.innerHTML = "";
+        srcBox.hidden = true; srcList.innerHTML = "";
+        stopBtn.hidden = true;
         outQ.textContent = question;
         outA.className = "a status";
         outA.textContent = "Thinking…";
@@ -175,14 +262,13 @@ const examples = [
           const data = await res.json();
           if (!res.ok || data.error) {
             outA.className = "a err";
-            outA.textContent =
-              data.detail && /429|neuron/i.test(data.detail)
-                ? "AskZ47 is temporarily over its daily AI limit. Please try again shortly."
-                : data.error || "Something went wrong. Please try again.";
+            outA.textContent = data.detail && /429|neuron/i.test(data.detail)
+              ? "AskZ47 is temporarily over its daily AI limit. Please try again shortly."
+              : data.error || "Something went wrong. Please try again.";
             return;
           }
           outA.className = "a";
-          outA.innerHTML = renderAnswer(data.answer || "(no answer)");
+          typeOut(data.answer || "(no answer)");
           const sources = (data.sources || []).filter((s: any) => s.url);
           if (sources.length) {
             for (const s of sources) {
@@ -193,8 +279,7 @@ const examples = [
               li.appendChild(a);
               if (s.collection) {
                 const tag = document.createElement("span");
-                tag.className = "src-tag";
-                tag.textContent = `  · ${s.collection}`;
+                tag.className = "src-tag"; tag.textContent = `  · ${s.collection}`;
                 li.appendChild(tag);
               }
               srcList.appendChild(li);
@@ -215,11 +300,9 @@ const examples = [
         if (q) { input.value = q; ask(q); }
       });
       document.getElementById("again")!.addEventListener("click", () => {
+        cancelType();
         document.body.classList.remove("answered");
-        document.body.classList.add("initial");
-        panel.hidden = true;
-        input.value = "";
-        input.focus();
+        panel.hidden = true; input.value = ""; input.focus();
       });
     </script>
   </body>
