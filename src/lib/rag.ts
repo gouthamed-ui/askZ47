@@ -4,7 +4,9 @@
 
 export const INDEX_NAME = "askz47-content";
 export const EMBED_MODEL = "@cf/baai/bge-base-en-v1.5";
-export const GEN_MODEL = "@cf/zai-org/glm-4.7-flash";
+// Lighter, non-reasoning model for now (cheaper per answer — no hidden "thinking" tokens).
+// Upgrade to "@cf/zai-org/glm-4.7-flash" later once on Workers Paid for higher answer quality.
+export const GEN_MODEL = "@cf/meta/llama-3.3-70b-instruct-fp8-fast";
 
 export interface Source {
   n: number;
@@ -98,7 +100,7 @@ export async function generate(env: any, question: string, used: any[]) {
         { role: "system", content: SYSTEM_PROMPT },
         { role: "user", content: `SOURCES:\n${context}\n\nQUESTION: ${question}` },
       ],
-      max_tokens: 2048, // reasoning models (GLM/Qwen) spend tokens thinking before the answer
+      max_tokens: 800, // non-reasoning model: answer tokens only, no thinking budget needed
       temperature: 0.2,
     }),
   });
