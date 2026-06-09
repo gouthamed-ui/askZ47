@@ -153,7 +153,13 @@ export async function answerQuestion(env: any, question: string) {
       search(env, vector, { topK: 15, filter: { kind: { $eq: kind } } }),
       search(env, vector, { topK: 6 }),
     ]);
-    used = dedupe([...filtered, ...general]).slice(0, 12);
+    // Merge the collection-filtered set (for complete enumeration) with the top
+    // unfiltered hits — the latter surface firm-level "about" docs that the kind
+    // filter excludes (e.g. an AUM question that also says "portfolio"). Keep the
+    // most relevant by score so neither intent starves the other.
+    used = dedupe([...filtered, ...general])
+      .sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
+      .slice(0, 12);
   } else {
     const matches = await search(env, vector, { topK: 10 });
     const relevant = matches.filter((m: any) => m.score >= 0.45);

@@ -50,7 +50,9 @@ async function answer(question) {
       search(vector, { topK: 15, filter: { kind: { $eq: kind } } }),
       search(vector, { topK: 6 }),
     ]);
-    used = dedupe([...filtered, ...general]).slice(0, 12);
+    used = dedupe([...filtered, ...general])
+      .sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
+      .slice(0, 12);
   } else {
     const matches = await search(vector, { topK: 10 });
     const relevant = matches.filter((m) => m.score >= 0.45);
