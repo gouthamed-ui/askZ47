@@ -1,15 +1,15 @@
 # AskZ47 — Build Progress & Handoff
 
-_Last updated: 2026-06-07. Resume here next session._
+_Last updated: 2026-06-09. Resume here next session._
 
-## ⛔ RESUME HERE — the one blocker
-**Cloudflare Workers AI free tier (10,000 neurons/day) is exhausted → live answers return `429` and the bot is paused.** Everything else is built and working. To continue:
-1. **Upgrade the Cloudflare account to Workers Paid (~$5/mo).** Direct link: https://dash.cloudflare.com/0dae0dd23b1e4928c118e43c9ad3590d/workers/plans (or dash → Compute/Workers → Plans → Workers Paid). This removes the daily hard-cap (then ~$0.011/1k neurons usage); no redeploy needed — `/api/ask` just starts answering again.
-2. Then run the **live end-to-end test** through the UI: open `https://z47.webflow.io/app`, ask the Scapia / fintech-companies / enterprise-AI-team questions, confirm grounded answers + working source links.
-3. Then **launch polish** (see bottom).
+## ✅ Blocker cleared — RESUME HERE
+**The CF neuron blocker is gone — Workers Paid upgraded 2026-06-09 (daily 10k-neuron cap removed; now metered usage on top of $5/mo). Set a CF billing notification as the cost backstop.** Live `/api/ask` answers (HTTP 200, grounded + cited). Full handoff e2e test is green across collections (fintech-company enumeration, Scapia funding history, enterprise-AI team member — all correct with working www.z47.com links). Now mid-Phase-5. To continue:
+1. **Review + deploy the uncommitted launch-polish changes** (see "Done 2026-06-09" below) — they build clean but are NOT committed/pushed yet. `git diff` then commit + `git push origin main` (auto-deploys to `https://z47.webflow.io/app`).
+2. **Decide production placement** (launch-polish #3): mount path `/ask` + nav link on z47.com, OR rebuild the UI natively in Webflow Designer. This is the main remaining launch decision.
+3. Then the rest of launch polish (incremental indexer, answer-quality pass / GLM upgrade).
 
 ## TL;DR
-Full RAG chatbot works end-to-end on Webflow Cloud: question → embed → Vectorize search → LLM → grounded, cited answer with working z47.com source links. Reference-resolution + metadata-filtered retrieval done (enumeration questions work). Dixon-Baxi-style light-mode UI built. **Only blocker = the CF neuron limit above.**
+Full RAG chatbot works end-to-end on Webflow Cloud: question → embed → Vectorize search → LLM → grounded, cited answer with working z47.com source links. Reference-resolution + metadata-filtered retrieval done (enumeration questions work). Dixon-Baxi-style light-mode UI built. **Blocker cleared 2026-06-09 — bot answering live; now in Phase 5 launch polish.**
 
 ## Status by phase
 | Phase | Status |
@@ -19,12 +19,12 @@ Full RAG chatbot works end-to-end on Webflow Cloud: question → embed → Vecto
 | 2. Content indexer (891 items, refs resolved) | ✅ done |
 | 3. Answer engine `/api/ask` (+ filtered retrieval) | ✅ live, validated |
 | 4. Chat UI (code app at `/app`, NOT Webflow Designer) | ✅ built — light mode, Z47 brand |
-| 5. Launch polish | ⬜ pending (after CF upgrade) |
+| 5. Launch polish | 🟡 in progress — diagnostics removed + rate-limit added (uncommitted); placement TBD |
 
 ## Live endpoints (deployed app)
 - App / chat UI (mount path `/app`): `https://z47.webflow.io/app`
 - Answer API: `https://z47.webflow.io/app/api/ask?q=...` (also POST `{ "question": "..." }`) → `{ answer, sources[] }`
-- Diagnostic: `https://z47.webflow.io/app/api/ai-test` — **REMOVE before launch** (unauthenticated; can burn Workers AI quota)
+- Diagnostic: ~~`/app/api/ai-test`~~ — **deleted in working tree 2026-06-09** (uncommitted; still live until next deploy)
 
 ## Key facts / config
 - Webflow site: **z47** — Site ID `678518036ebf6d040622b6b3`; canonical host is **www.z47.com** (apex 404s on CMS pages)
@@ -82,12 +82,21 @@ git add -A && git commit -m "..." && git push origin main
 - **Hit the CF neuron limit** during testing → see blocker at top. Filtered-retrieval was still validated neuron-free (kind=portfolio/team filters return the right sets with topics).
 - **Client comms drafted (in chat, not yet saved as files):** (1) an update email to marketing heads Madhavi & Vineet; (2) a full client walkthrough/narration script. Ask the agent to save these to `client-update-email.md` / `client-walkthrough.md` if wanted.
 
-## Launch polish (Phase 5 — after CF upgrade)
-1. Remove the public `/api/ai-test` diagnostic.
-2. Add light rate-limiting on `/api/ask` (abuse / cost guard).
-3. Confirm/choose production placement on z47.com: mount path (e.g. `/ask`) + nav link, OR rebuild UI natively in Webflow Designer (option B above).
-4. Make the indexer incremental (cut re-index neuron cost).
-5. Final answer-quality pass across all 5 collections; optionally A/B Llama vs GLM vs Qwen3.
+## Done 2026-06-09 (resume: blocker cleared + Phase 5 hygiene)
+- **Confirmed the CF neuron blocker is cleared** — live `/api/ask` returns HTTP 200 with grounded, cited answers. Ran the full handoff e2e test: fintech companies (portfolio enumeration — Oxyzo, Razorpay, Jupiter, …), Scapia (funding history), enterprise-AI team member — all correct with working www.z47.com source links.
+- **Launch hygiene (uncommitted, builds clean via `npm run build`):**
+  - Deleted `src/pages/api/ai-test.ts` (unauthenticated diagnostic) and `src/pages/api/hello.ts` (scaffold).
+  - Added best-effort per-IP rate limiting to `src/pages/api/ask.ts` (in-file comment explains the per-isolate limitation + dashboard-budget backstop).
+  - Changes NOT committed/pushed per request — review with `git status` / `git diff`, then commit + `git push origin main` to deploy.
+- **Generation model switched (uncommitted): Llama 3.3 70B → `@cf/openai/gpt-oss-120b`** — best reasoning model in the CF catalog, cheaper per-token, 128k ctx. Changes in `src/lib/rag.ts`: `reasoning:{effort:"low"}`, `max_tokens` 2048, normalize fullwidth citations 【n】→[n], plain-text/no-Markdown rule added to SYSTEM_PROMPT. UI `src/pages/index.astro` now renders `\n`→`<br>`. New A/B harness `scripts/gen-test.mjs` (embed→retrieve→generate for any model — also runs Llama/Gemma for comparison). Validated on the 3 known-good questions: clean plain-text, correct ASCII citations, richer fintech enumeration; latency 1.4–4.1s. To revert: set `GEN_MODEL` back to Llama in `rag.ts`.
+- **Resolved the enterprise-AI flag:** both Llama (live) and gpt-oss return **Rajinder Balaraman** for "who focuses on enterprise AI" — the handoff's "Ashwin Pandian" (06-07) was stale, not a regression.
+
+## Launch polish (Phase 5)
+1. ✅ Removed the public `/api/ai-test` diagnostic (+ leftover `/api/hello` scaffold). _Uncommitted — takes effect on the live site only after deploy._
+2. ✅ Added light per-IP rate-limiting on `/api/ask` (fixed-window 15/min → `429` + `Retry-After`). Best-effort/in-memory — Workers isolates don't share state, so the real cost cap is the CF dashboard budget (set one). _Uncommitted._
+3. ⬜ **Confirm/choose production placement on z47.com**: mount path (e.g. `/ask`) + nav link, OR rebuild UI natively in Webflow Designer (option B above). ← main remaining launch decision.
+4. ⬜ Make the indexer incremental (cut re-index neuron cost).
+5. ⬜ Final answer-quality pass across all 5 collections; optionally A/B Llama vs GLM vs Qwen3. NOTE: "Who focuses on enterprise AI" now returns **Rajinder Balaraman** (was **Ashwin Pandian** on 06-07) — verify which is correct here.
 6. (v2 idea) "What's new at Z47" weekly panel; YouTube transcripts + jump-to-moment.
 
 ## Known good (verified)

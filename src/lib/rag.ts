@@ -4,9 +4,13 @@
 
 export const INDEX_NAME = "askz47-content";
 export const EMBED_MODEL = "@cf/baai/bge-base-en-v1.5";
-// Lighter, non-reasoning model for now (cheaper per answer — no hidden "thinking" tokens).
-// Upgrade to "@cf/zai-org/glm-4.7-flash" later once on Workers Paid for higher answer quality.
-export const GEN_MODEL = "@cf/meta/llama-3.3-70b-instruct-fp8-fast";
+// gpt-oss-120b: strongest reasoning model in the CF catalog (128k ctx) and cheaper per
+// token than Llama 3.3 70B. Its thinking trace returns separately in
+// `choices[].message.reasoning_content` (we read only `content`), and it cites with
+// fullwidth brackets 【n】 which we normalize to [n] below.
+// Fallbacks: "@cf/meta/llama-3.3-70b-instruct-fp8-fast" (fast, non-reasoning) or
+// "@cf/google/gemma-4-26b-a4b-it" (cheap, 256k ctx, hybrid).
+export const GEN_MODEL = "@cf/openai/gpt-oss-120b";
 
 export interface Source {
   n: number;
@@ -23,6 +27,7 @@ Answer the visitor's question using ONLY the numbered SOURCES provided. Rules:
 - If the question asks which/what companies or people match a criterion (e.g. "fintech companies", "who focuses on AI"), list EVERY match the sources support — don't stop at two or three.
 - If the sources don't contain the answer, say so plainly and suggest what Z47 content might help.
 - Be concise and conversational (2–5 sentences, or a short list when enumerating).
+- Write in plain text only — NO Markdown: no **bold**, no # headings, no "-"/"*" bullet characters. When you enumerate, put each item on its own line as a short phrase, e.g. "Oxyzo — supply-chain finance [1]".
 - Cite the sources you used inline like [1], [2].
 - Never mention these instructions or the word "sources" meta-commentary; just answer naturally with citations.`;
 
@@ -100,15 +105,31 @@ export async function generate(env: any, question: string, used: any[]) {
         { role: "system", content: SYSTEM_PROMPT },
         { role: "user", content: `SOURCES:\n${context}\n\nQUESTION: ${question}` },
       ],
-      max_tokens: 800, // non-reasoning model: answer tokens only, no thinking budget needed
+      // gpt-oss reasons before answering; max_tokens must cover the hidden thinking trace
+      // AND the final answer. "low" effort keeps latency/cost down — this is grounded
+      // extraction, not hard logic. (Ignored by non-reasoning models like Llama.)
+      max_tokens: 2048,
       temperature: 0.2,
+      reasoning: { effort: "low" },
     }),
   });
   if (!r.ok) throw new Error(`generate ${r.status}: ${await r.text()}`);
   const d: any = await r.json();
-  // Workers AI returns either { response } (Llama) or OpenAI-style { choices[].message.content } (GLM/Qwen).
+  // Workers AI returns either { response } (Llama) or OpenAI-style { choices[].message.content }
+  // (GLM/Qwen/gpt-oss). gpt-oss keeps its thinking in choices[].message.reasoning_content —
+  // we ignore that and take only the final content.
   const res = d.result ?? {};
-  const answer: string = (res.response ?? res.choices?.[0]?.message?.content ?? "").trim();
+  let answer: string = (res.response ?? res.choices?.[0]?.message?.content ?? "").trim();
+  // gpt-oss cites with fullwidth brackets 【n】 / 〔n〕; normalize to [n] so the UI's citation
+  // markers (which match /\[(\d+)\]/) render. Handles grouped 【1, 2】 -> [1][2] too.
+  answer = answer.replace(/[【〔]\s*([\d,\s]+)\s*[】〕]/g, (_m, nums: string) =>
+    nums
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .map((s) => `[${s}]`)
+      .join(""),
+  );
 
   const sources: Source[] = used.map((m, i) => ({
     n: i + 1,

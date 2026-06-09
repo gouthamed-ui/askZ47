@@ -208,7 +208,9 @@ const rotating = [
         return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
       }
       function renderAnswer(text: string, caret = false) {
-        const html = escapeHtml(text).replace(/\[(\d+)\]/g, '<span class="cite">[$1]</span>');
+        const html = escapeHtml(text)
+          .replace(/\[(\d+)\]/g, '<span class="cite">[$1]</span>')
+          .replace(/\n/g, "<br>");
         return caret ? html + '<span class="caret">▍</span>' : html;
       }
 
