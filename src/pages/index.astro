@@ -117,40 +117,60 @@ const rotating = [
 
       .sources { margin-top: 28px; border-top: 1px solid var(--line); padding-top: 18px; }
       .sources h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 0 0 14px; font-weight: 600; }
-      .src-list { display: flex; flex-direction: column; gap: 8px; }
-
-      /* media row: thumbnail/avatar + title + type chip + [n] badge, whole row links out */
-      .src-card {
-        display: flex; align-items: center; gap: 14px;
-        padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px;
-        background: #fff; text-decoration: none; color: var(--fg);
-        transition: border-color .15s ease, box-shadow .15s ease, transform .12s ease;
+      /* bento grid: tiles vary in size by content type, dense-packed to fill gaps */
+      .src-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+        grid-auto-rows: 124px;
+        grid-auto-flow: dense;
+        gap: 10px;
       }
-      .src-card:hover { border-color: var(--accent); box-shadow: 0 2px 12px rgba(232,112,42,.10); transform: translateY(-1px); }
-
-      .src-media {
-        flex: none; width: 52px; height: 52px; border-radius: 10px; overflow: hidden;
-        background: #f4f2ee; display: grid; place-items: center;
+      .bento {
+        position: relative; overflow: hidden; border-radius: 14px;
+        border: 1px solid var(--line); background: #f4f2ee;
+        text-decoration: none; color: var(--fg);
+        display: flex; flex-direction: column; justify-content: flex-end;
+        transition: transform .14s ease, box-shadow .14s ease, border-color .14s ease;
       }
-      .src-media img { width: 100%; height: 100%; object-fit: cover; display: block; }
-      .src-media.m-team { border-radius: 50%; }
-      .src-media.m-logo { background: #fff; border: 1px solid var(--line); }
-      .src-media.m-logo img { object-fit: contain; padding: 7px; }
-      .src-media.m-mono {
-        background: var(--accent); color: #fff; font-weight: 700;
-        font-size: 13px; letter-spacing: -0.02em;
-      }
+      .bento:hover { transform: translateY(-2px); box-shadow: 0 8px 22px rgba(0,0,0,.12); border-color: var(--accent); }
+      .bento.wide { grid-column: span 2; }
+      .bento.feature { grid-column: span 2; grid-row: span 2; }
 
-      .src-body { flex: 1; min-width: 0; }
-      .src-title {
-        font-size: 15.5px; font-weight: 600; line-height: 1.32; color: var(--fg);
+      /* full-bleed image tiles (team photo, podcast/news thumbnail) */
+      .b-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
+      .b-shade { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(0,0,0,0) 38%, rgba(0,0,0,.72) 100%); }
+
+      /* contained logo tile (portfolio) */
+      .bento.logo { background: #fff; }
+      .b-logo { position: absolute; left: 12px; right: 12px; top: 12px; bottom: 44px;
+        background-position: center; background-repeat: no-repeat; background-size: contain; }
+
+      /* monogram tile (about-docs / missing image) — light "reference" style so
+         clusters of image-less sources don't become a solid orange wall */
+      .bento.mono { background: var(--wash); border-color: #f1ddcd; }
+      .b-mark { position: absolute; top: 11px; left: 13px; font-weight: 800; font-size: 16px; color: var(--accent); letter-spacing: -.03em; }
+
+      .b-body { position: relative; padding: 10px 12px; }
+      .b-title {
+        font-size: 13.5px; font-weight: 600; line-height: 1.28; margin: 0;
         display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
       }
-      .src-card:hover .src-title { color: var(--accent); }
-      .src-meta { margin-top: 3px; font-size: 13px; color: var(--muted); display: flex; align-items: center; gap: 6px; min-width: 0; }
-      .src-kind { color: var(--accent); font-weight: 600; white-space: nowrap; }
-      .src-host { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-      .src-n { flex: none; align-self: flex-start; font-size: 12px; font-weight: 600; color: var(--accent); }
+      .b-meta { margin-top: 2px; font-size: 11.5px; display: flex; align-items: center; gap: 5px; }
+      .b-kind { font-weight: 700; letter-spacing: .01em; }
+      .bento.feature .b-title { font-size: 16px; -webkit-line-clamp: 3; }
+      /* text colour per tile background */
+      .bento.img .b-title { color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,.35); }
+      .bento.img .b-meta, .bento.img .b-kind { color: rgba(255,255,255,.88); }
+      .bento.mono .b-title { color: var(--fg); }
+      .bento.mono .b-meta, .bento.mono .b-kind { color: var(--accent); }
+      .bento.logo .b-title { color: var(--fg); }
+      .bento.logo .b-kind { color: var(--accent); }
+
+      /* [n] badge — keeps citations mapped to tiles */
+      .b-n { position: absolute; top: 8px; right: 9px; font-size: 11px; font-weight: 700; border-radius: 7px; padding: 1px 6px; }
+      .bento.img .b-n { color: #fff; background: rgba(0,0,0,.42); }
+      .bento.mono .b-n { color: var(--accent); background: rgba(232,112,42,.12); }
+      .bento.logo .b-n { color: var(--accent); background: rgba(232,112,42,.12); }
 
       .again {
         margin-top: 30px; border: 1px solid var(--line); background: #fff; color: var(--fg);
@@ -169,8 +189,8 @@ const rotating = [
         input { font-size: 16px; padding: 11px 0; }
         button.ask { padding: 11px 16px; }
         .answer .a { font-size: 17px; }
-        .src-media { width: 44px; height: 44px; }
-        .src-title { font-size: 14.5px; }
+        .src-grid { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); grid-auto-rows: 108px; gap: 8px; }
+        .bento.feature .b-title { font-size: 14.5px; }
       }
     </style>
   </head>
@@ -198,7 +218,7 @@ const rotating = [
         <div class="controls"><button class="stop" id="stop" type="button" hidden>Stop</button></div>
         <div class="sources" id="out-sources" hidden>
           <h2>Sources</h2>
-          <div class="src-list" id="out-list"></div>
+          <div class="src-grid" id="out-list"></div>
         </div>
         <button class="again" id="again" type="button">Ask another question</button>
       </section>
@@ -273,63 +293,58 @@ const rotating = [
 
       function setBusy(b: boolean) { askBtn.disabled = b; input.disabled = b; }
 
-      // ---- source cards (thumbnail/avatar + title + type chip + [n], links out) ----
+      // ---- bento source tiles (image/logo/monogram + title + type + [n], links out) ----
       const KIND_LABEL: Record<string, string> = {
         team: "Team", podcast: "Podcast", news: "News",
         portfolio: "Portfolio", faq: "FAQ", about: "About Z47",
       };
-      function prettyHost(u: string): string {
-        try {
-          const url = new URL(u);
-          const host = url.hostname.replace(/^www\./, "");
-          const seg = url.pathname.split("/").filter(Boolean)[0];
-          return seg ? `${host}/${seg}` : host;
-        } catch { return ""; }
-      }
-      function buildSourceCard(s: any): HTMLAnchorElement {
+      function buildBentoTile(s: any): HTMLAnchorElement {
         const kind = s.kind || "about";
+        // mode drives the visual: full-bleed photo/thumb (img), contained logo (logo),
+        // or a Z47 monogram tile (mono) when there's no usable image.
+        let mode = s.image ? (kind === "portfolio" ? "logo" : "img") : "mono";
+        // size: top hit is a 2x2 hero (if it has a photo); podcasts/news get wide tiles;
+        // everything else is a 1x1 square. grid-auto-flow:dense backfills the gaps.
+        let span = "";
+        if (mode === "img" && s.n === 1) span = "feature";
+        else if (kind === "podcast" || kind === "news") span = "wide";
+
         const a = document.createElement("a");
-        a.className = "src-card";
+        a.className = ["bento", mode, span].filter(Boolean).join(" ");
         a.href = s.url; a.target = "_blank"; a.rel = "noopener";
 
-        // media: real image (avatar for team, contained logo for portfolio, cover thumb
-        // otherwise); fall back to a Z47 monogram tile when there's no image.
-        const media = document.createElement("span");
-        const shape = kind === "team" ? "m-team" : kind === "portfolio" ? "m-logo" : "";
-        if (s.image) {
-          media.className = ("src-media " + shape).trim();
+        if (mode === "img") {
           const img = document.createElement("img");
-          img.src = s.image; img.alt = s.title || ""; img.loading = "lazy";
-          img.addEventListener("error", () => { media.className = "src-media m-mono"; media.textContent = "Z47"; });
-          media.appendChild(img);
+          img.className = "b-img"; img.src = s.image; img.alt = s.title || ""; img.loading = "lazy";
+          img.addEventListener("error", () => { // image 404 -> degrade to a monogram tile
+            a.className = ["bento", "mono", span].filter(Boolean).join(" ");
+            a.querySelector(".b-img")?.remove(); a.querySelector(".b-shade")?.remove();
+            const mk = document.createElement("span"); mk.className = "b-mark"; mk.textContent = "Z47";
+            a.prepend(mk);
+          });
+          const shade = document.createElement("span"); shade.className = "b-shade";
+          a.appendChild(img); a.appendChild(shade);
+        } else if (mode === "logo") {
+          const logo = document.createElement("span");
+          logo.className = "b-logo"; logo.style.backgroundImage = `url("${s.image}")`;
+          a.appendChild(logo);
         } else {
-          media.className = "src-media m-mono";
-          media.textContent = "Z47";
+          const mk = document.createElement("span"); mk.className = "b-mark"; mk.textContent = "Z47";
+          a.appendChild(mk);
         }
 
-        const body = document.createElement("span");
-        body.className = "src-body";
-        const title = document.createElement("span");
-        title.className = "src-title";
+        const body = document.createElement("span"); body.className = "b-body";
+        const title = document.createElement("span"); title.className = "b-title";
         title.textContent = s.title || s.url;
-        const meta = document.createElement("span");
-        meta.className = "src-meta";
-        const kindEl = document.createElement("span");
-        kindEl.className = "src-kind";
+        const meta = document.createElement("span"); meta.className = "b-meta";
+        const kindEl = document.createElement("span"); kindEl.className = "b-kind";
         kindEl.textContent = KIND_LABEL[kind] || "Z47";
         meta.appendChild(kindEl);
-        const host = prettyHost(s.url);
-        if (host) {
-          const dot = document.createElement("span"); dot.textContent = "·";
-          const h = document.createElement("span"); h.className = "src-host"; h.textContent = host;
-          meta.appendChild(dot); meta.appendChild(h);
-        }
         body.appendChild(title); body.appendChild(meta);
+        a.appendChild(body);
 
-        const n = document.createElement("span");
-        n.className = "src-n"; n.textContent = `[${s.n}]`;
-
-        a.appendChild(media); a.appendChild(body); a.appendChild(n);
+        const n = document.createElement("span"); n.className = "b-n"; n.textContent = `[${s.n}]`;
+        a.appendChild(n);
         return a;
       }
 
@@ -364,7 +379,7 @@ const rotating = [
           typeOut(data.answer || "(no answer)");
           const sources = (data.sources || []).filter((s: any) => s.url);
           if (sources.length) {
-            for (const s of sources) srcList.appendChild(buildSourceCard(s));
+            for (const s of sources) srcList.appendChild(buildBentoTile(s));
             srcBox.hidden = false;
           }
         } catch {
