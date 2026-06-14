@@ -16,7 +16,9 @@ export interface Source {
   n: number;
   title: string;
   collection: string;
+  kind: string | null;
   url: string | null;
+  image: string | null;
   score: number;
 }
 
@@ -135,7 +137,9 @@ export async function generate(env: any, question: string, used: any[]) {
     n: i + 1,
     title: m.metadata?.title ?? "",
     collection: m.metadata?.collection ?? "",
+    kind: m.metadata?.kind ?? null,
     url: m.metadata?.url ?? null,
+    image: m.metadata?.image ?? null,
     score: Number(m.score?.toFixed(3) ?? 0),
   }));
 

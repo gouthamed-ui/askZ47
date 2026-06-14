@@ -15,6 +15,7 @@ export const COLLECTIONS = [
     textFields: ["short-description", "body", "founder-testimonial"],
     refFields: ["primary-sector", "tags", "portfolio-company", "team-members"],
     urlBase: "https://www.z47.com/z47-moments/",
+    imageFields: ["thumbnail", "seo-open-graph-image"],
   },
   {
     key: "news",
@@ -24,6 +25,7 @@ export const COLLECTIONS = [
     textFields: ["news-text"],
     refFields: ["primary-sector", "sectors", "tags", "portfolio", "founders-team-members"],
     urlBase: "https://www.z47.com/news/",
+    imageFields: ["thumbnail"],
   },
   {
     key: "faq",
@@ -42,6 +44,7 @@ export const COLLECTIONS = [
     textFields: ["short-description1", "funding-round", "year-invested", "year-started"],
     refFields: ["primary-sector", "focus-area", "portfolio-tags", "tags"],
     urlBase: "https://www.z47.com/portfolio/",
+    imageFields: ["logo", "black--logo"],
   },
   {
     key: "team",
@@ -51,6 +54,7 @@ export const COLLECTIONS = [
     textFields: ["designation", "quote", "short-description", "long-description-rich-text", "city"],
     refFields: ["focus-sectors", "invest-in-sectors-2"],
     urlBase: "https://www.z47.com/team/",
+    imageFields: ["photo"],
   },
 ];
 
@@ -168,6 +172,16 @@ export async function buildNameMap(token) {
   return map;
 }
 
+// Pick the first usable image URL from a collection's ordered imageFields.
+// Webflow image fields are objects like { fileId, url, alt }; some are null.
+function resolveImage(fieldData, imageFields) {
+  for (const field of imageFields || []) {
+    const v = fieldData[field];
+    if (v && typeof v === "object" && v.url) return String(v.url);
+  }
+  return null;
+}
+
 // Resolve an item's reference fields (arrays or single IDs) to deduped names.
 function resolveRefs(fieldData, refFields, nameMap) {
   const names = [];
@@ -198,6 +212,7 @@ export function buildDoc(col, item, nameMap = new Map()) {
   const text = parts.join("\n\n").slice(0, 6000); // cap per-item input
   const slug = f.slug || "";
   const url = col.urlBase && slug ? col.urlBase + slug : null;
+  const image = resolveImage(f, col.imageFields); // thumbnail / photo / logo for source cards
   const flat = text.replace(/\s+/g, " ").trim();
   return {
     id: `${col.key}:${item.id}`,
@@ -207,6 +222,7 @@ export function buildDoc(col, item, nameMap = new Map()) {
       kind: col.key, // filterable: portfolio | team | news | podcast | faq
       title: String(title).slice(0, 200),
       ...(url ? { url } : {}),
+      ...(image ? { image } : {}),
       ...(refNames.length ? { topics: refNames.join(", ").slice(0, 300) } : {}),
       // content the answer model reads for grounding (Vectorize metadata cap is ~10KiB/vector)
       content: flat.slice(0, 2000),
