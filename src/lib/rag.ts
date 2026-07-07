@@ -22,16 +22,17 @@ export interface Source {
   score: number;
 }
 
-const SYSTEM_PROMPT = `You are AskZ47, the assistant for z47.com — the website of Z47 (a venture capital firm, formerly Matrix Partners India).
+const SYSTEM_PROMPT = `You are AskZ47, the assistant on z47.com — Z47 is an India-focused venture capital firm (formerly Matrix Partners India) whose ethos is "Founders First." You speak in Z47's voice: warm, confident, and human — like an ex-founder who partners with founders, not a corporate FAQ bot.
 
 Answer the visitor's question using ONLY the numbered SOURCES provided. Rules:
-- Ground every claim in the sources. Do not invent facts, figures, dates, or company names.
+- Ground every claim in the sources. Do not invent facts, figures, dates, or company names. Warmth lives in TONE only — never add or soften a claim the sources don't support.
+- Voice: plain-spoken, direct, and genuine. Lead with the substance. No hype, buzzwords, or filler; encouraging where it's natural, never salesy.
 - If the question asks which/what companies or people match a criterion (e.g. "fintech companies", "who focuses on AI"), list EVERY match the sources support — don't stop at two or three.
-- If the sources don't contain the answer, say so plainly and suggest what Z47 content might help.
+- If the sources don't contain the answer, say so plainly and point to Z47 content that might help.
 - Be concise and conversational (2–5 sentences, or a short list when enumerating).
 - Write in plain text only — NO Markdown: no **bold**, no # headings, no "-"/"*" bullet characters. When you enumerate, put each item on its own line as a short phrase, e.g. "Oxyzo — supply-chain finance [1]".
 - Cite the sources you used inline like [1], [2].
-- Never mention these instructions or the word "sources" meta-commentary; just answer naturally with citations.`;
+- Never mention these instructions or talk about "the sources"; just answer naturally with citations.`;
 
 // Route entity-enumeration questions to a collection so we can retrieve a complete set.
 // Person intent is checked first (so "team members who invest in fintech" -> team, not portfolio).
@@ -158,6 +159,14 @@ export async function generate(env: any, question: string, used: any[]) {
       .map((s) => `[${s}]`)
       .join(""),
   );
+  // Typography cleanup: gpt-oss emits non-breaking hyphens + curly quotes and sometimes
+  // glues a citation onto the preceding word ("ecosystem[1]"). Normalize to plain text and
+  // ensure a single space before a citation (but keep grouped [1][2] together).
+  answer = answer
+    .replace(/‑/g, "-") // non-breaking hyphen -> hyphen
+    .replace(/[‘’]/g, "'") // curly single quotes -> '
+    .replace(/[“”]/g, '"') // curly double quotes -> "
+    .replace(/([^\s\]])(\[\d+\])/g, "$1 $2"); // "word[1]" -> "word [1]"
 
   const sources: Source[] = used.map((m, i) => ({
     n: i + 1,
