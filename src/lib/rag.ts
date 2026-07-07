@@ -54,6 +54,32 @@ function dedupe(matches: any[]): any[] {
   return out;
 }
 
+// Collapse multiple chunks of the same page (same url) into ONE source: crawled pages are
+// chunked, so without this a long page shows up as [1][2][3][4] duplicates. Keeps up to 3
+// chunks' text merged for grounding, the best score, and presents a single citation.
+// Items without a url (e.g. FAQs) stay separate, keyed by id.
+function mergeByUrl(matches: any[]): any[] {
+  const groups = new Map<string, any>();
+  const order: string[] = [];
+  for (const m of matches) {
+    const key = m.metadata?.url || `__id:${m.id}`;
+    const existing = groups.get(key);
+    if (!existing) {
+      groups.set(key, { ...m, metadata: { ...m.metadata }, _chunks: [m.metadata?.content || ""] });
+      order.push(key);
+    } else {
+      existing.score = Math.max(existing.score ?? 0, m.score ?? 0);
+      if (existing._chunks.length < 3) existing._chunks.push(m.metadata?.content || "");
+    }
+  }
+  return order.map((k) => {
+    const g = groups.get(k);
+    g.metadata.content = g._chunks.filter(Boolean).join("\n").slice(0, 3000);
+    delete g._chunks;
+    return g;
+  });
+}
+
 function cfBase(env: any) {
   return `https://api.cloudflare.com/client/v4/accounts/${env.CF_ACCOUNT_ID}`;
 }
@@ -159,15 +185,15 @@ export async function answerQuestion(env: any, question: string) {
     ]);
     // Merge the collection-filtered set (for complete enumeration) with the top
     // unfiltered hits — the latter surface firm-level "about" docs that the kind
-    // filter excludes (e.g. an AUM question that also says "portfolio"). Keep the
-    // most relevant by score so neither intent starves the other.
-    used = dedupe([...filtered, ...general])
+    // filter excludes (e.g. an AUM question that also says "portfolio"). Collapse
+    // same-page chunks, then keep the most relevant by score so neither intent starves.
+    used = mergeByUrl(dedupe([...filtered, ...general]))
       .sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
       .slice(0, 12);
   } else {
-    const matches = await search(env, vector, { topK: 10 });
+    const matches = await search(env, vector, { topK: 12 });
     const relevant = matches.filter((m: any) => m.score >= 0.45);
-    used = (relevant.length ? relevant : matches).slice(0, 8);
+    used = mergeByUrl(relevant.length ? relevant : matches).slice(0, 8);
   }
 
   return generate(env, question, used);
